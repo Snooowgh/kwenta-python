@@ -1,0 +1,2 @@
+setuptools
+web3_multicall@git+https://github.com/Snooowgh/py_web3_multicall.git@master
