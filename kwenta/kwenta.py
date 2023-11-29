@@ -886,56 +886,38 @@ class Kwenta:
         str: token transfer Tx id
         """
         sm_account_contract = self.sm_account_contract
-        if token_amount == 0:
-            raise Exception("token_amount Cannot be 0.")
-
-        current_position = self.get_current_position(
-            token_symbol, wallet_address=self.sm_account
-        )["margin"]
-        logger.debug(f"Current Position: {current_position}")
-        if token_amount < current_position:
-            is_withdrawal = -1
-            token_amount = self.web3.to_wei(abs(token_amount), "ether") * is_withdrawal
-            if execute_now:
-                if token_amount < 0:
-                    logger.debug(f"Withdrawal sUSD to {token_symbol} Market.")
-                    if withdrawal_all:
-                        commandBytes = encode(
-                            ["address"],
-                            [str(self.markets[token_symbol.upper()]["market_address"])],
-                        )
-                        data_tx = sm_account_contract.encodeABI(
-                            fn_name="execute", args=[[3], [commandBytes]]
-                        )
-                    else:
-                        commandBytes = encode(
-                            ["address", "int256"],
-                            [
-                                str(
-                                    self.markets[token_symbol.upper()]["market_address"]
-                                ),
-                                token_amount,
-                            ],
-                        )
-                        data_tx = sm_account_contract.encodeABI(
-                            fn_name="execute", args=[[2], [commandBytes]]
-                        )
-                    if nonce != -1:
-                        tx_params = self._get_tx_params(to=self.sm_account, value=0, nonce=nonce)
-                    else:
-                        tx_params = self._get_tx_params(to=self.sm_account, value=0)
-                    tx_params["data"] = data_tx
-                    tx_params["nonce"] = self.web3.eth.get_transaction_count(
-                        self.wallet_address
+        token_amount = int(token_amount * 10 ** 18)
+        tx_params = {}
+        if execute_now:
+            if token_amount < 0:
+                logger.debug(f"Withdrawal sUSD from {token_symbol} Market.")
+                if withdrawal_all:
+                    commandBytes = encode(
+                        ["address"],
+                        [TOKEN_MARKET_ADDRESS_MAP[token_symbol]],
                     )
-                    tx_token = self.execute_transaction(tx_params)
-                    return tx_token
-            else:
-                return {"token_amount": token_amount / (10 ** 18), "tx_data": tx_params}
+                    data_tx = sm_account_contract.encodeABI(
+                        fn_name="execute", args=[[3], [commandBytes]]
+                    )
+                else:
+                    commandBytes = encode(
+                        ["address", "int256"],
+                        [
+                            str(
+                                TOKEN_MARKET_ADDRESS_MAP[token_symbol]
+                            ),
+                            token_amount,
+                        ],
+                    )
+                    data_tx = sm_account_contract.encodeABI(
+                        fn_name="execute", args=[[2], [commandBytes]]
+                    )
+                tx_params = self._get_tx_params(to=self.sm_account, value=0)
+                tx_params["data"] = data_tx
+                tx_token = self.execute_transaction(tx_params)
+                return tx_token
         else:
-            logger.debug(
-                f"Token amount must be less than Current Position: {current_position}"
-            )
+            return {"token_amount": token_amount / (10 ** 18), "tx_data": tx_params}
 
     def transfer_margin(
             self,
@@ -1055,7 +1037,7 @@ class Kwenta:
             self,
             token_symbol: str,
             position_size: float,
-            slippage: float = DEFAULT_SLIPPAGE,
+            desired_fill_price: float,
             execute_now: bool = False,
             self_execute: bool = False,
             nonce: int = -1,
@@ -1082,19 +1064,12 @@ class Kwenta:
         str: token transfer Tx id
         """
         sm_account_contract = self.sm_account_contract
-        is_short = -1 if position_size < 0 else 1
-        position_size = self.web3.to_wei(abs(position_size), "ether") * is_short
-        current_position = self.get_current_position(token_symbol)
-        current_price = self.get_current_asset_price(token_symbol)
-        desired_fill_price = int(
-            current_price["wei"] + current_price["wei"] * (slippage / 100) * is_short
-        )
-
-        logger.debug(f"Current Position Size: {current_position['size']}")
+        position_size = int(position_size * 10 ** 18)
+        desired_fill_price = int(desired_fill_price * 10 ** 18)
         commandBytes = encode(
-            ["address", "int256", "int256"],
+            ["address", "int256", "uint256"],
             [
-                (self.markets[token_symbol.upper()]["market_address"]),
+                (TOKEN_MARKET_ADDRESS_MAP[token_symbol]),
                 position_size,
                 desired_fill_price,
             ],
@@ -1111,14 +1086,12 @@ class Kwenta:
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
             logger.debug(f"TX: {tx_token}")
-
             if self_execute:
                 self._wait_and_execute(tx_token, token_symbol)
             return tx_token
         else:
             return {
                 "token": token_symbol.upper(),
-                "current_position": current_position["size"],
                 "tx_data": tx_params,
             }
 
@@ -1459,7 +1432,8 @@ class Kwenta:
 
         # wait until executable
         logger.debug("Waiting until order is executable")
-        time.sleep(delayed_order["executable_time"] - time.time())
+        if delayed_order["executable_time"] - time.time() > 0:
+            time.sleep(delayed_order["executable_time"] - time.time())
 
         # set up the estimate
         gas_estimate = None
