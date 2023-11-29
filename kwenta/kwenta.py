@@ -22,8 +22,11 @@ from eth_abi import encode
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import web3_multicall
+import logging
 
 warnings.filterwarnings("ignore")
+
+logger = logging.getLogger("kwenta")
 
 
 class Kwenta:
@@ -115,6 +118,16 @@ class Kwenta:
             self.sm_account = sm_address
         else:
             self.sm_account = self.get_sm_accounts(self.wallet_address)[0]
+
+        self.sm_account_contract = self.web3.eth.contract(
+            self.web3.to_checksum_address(self.sm_account), abi=abis["SM_Account"]
+        )
+
+    def get_sm_account_free_margin(self):
+        return self.sm_account_contract.functions.freeMargin().call()
+
+    def get_sm_account_committed_margin(self):
+        return self.sm_account_contract.functions.committedMargin().call()
 
     def load_all_markets(self):
         # init contracts
@@ -432,13 +445,13 @@ class Kwenta:
             to=self.web3.to_checksum_address(addresses["SMFactory"][self.network_id])
         )
         tx_params["data"] = data_tx
-        # print(tx_params)
+        # logger.debug(tx_params)
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
-            print(f"Creating New SM Account")
-            print(f"TX: {tx_token}")
-            time.sleep(4)
-            print(f"SM Accounts: {self.get_sm_accounts()}")
+            logger.debug(f"Creating New SM Account")
+            logger.debug(f"TX: {tx_token}")
+            # time.sleep(4)
+            logger.debug(f"SM Accounts: {self.get_sm_accounts()}")
             return tx_token
         else:
             return tx_params
@@ -512,7 +525,7 @@ class Kwenta:
         else:
             return fetch_positions(token_symbol)
 
-    def get_accessible_margin(self, address: str) -> dict:
+    def get_accessible_margin(self) -> dict:
         """
         Gets available NON-MARKET account margin
         ...
@@ -527,9 +540,9 @@ class Kwenta:
         ----------
         Dict: Margin remaining in wei and usd
         """
-        margin_allowed = self.get_susd_balance(address)["balance"]
+        margin_allowed = self.get_susd_balance(self.sm_account)["balance"]
         margin_usd = self.web3.from_wei(margin_allowed, "ether")
-        return {"margin_remaining": margin_allowed, "margin_remaining_usd": margin_usd}
+        return margin_usd
 
     def can_liquidate(self, token_symbol: str, wallet_address: str = None) -> dict:
         """
@@ -591,9 +604,9 @@ class Kwenta:
             tx_params["data"] = data_tx
             if execute_now:
                 tx_token = self.execute_transaction(tx_params)
-                print(f"Executing Liquidation for {token_symbol}")
-                print(f"TX: {tx_token}")
-                time.sleep(1)
+                logger.debug(f"Executing Liquidation for {token_symbol}")
+                logger.debug(f"TX: {tx_token}")
+                # time.sleep(1)
                 return tx_token
             else:
                 return {"token": token_symbol.upper(), "tx_data": tx_params}
@@ -612,9 +625,9 @@ class Kwenta:
             tx_params["data"] = data_tx
             if execute_now:
                 tx_token = self.execute_transaction(tx_params)
-                print(f"Executing Liquidation for {token_symbol}")
-                print(f"TX: {tx_token}")
-                time.sleep(1)
+                logger.debug(f"Executing Liquidation for {token_symbol}")
+                logger.debug(f"TX: {tx_token}")
+                # time.sleep(1)
                 return tx_token
             else:
                 return {"token": token_symbol.upper(), "tx_data": tx_params}
@@ -660,9 +673,9 @@ class Kwenta:
             tx_params["data"] = data_tx
             if execute_now:
                 tx_token = self.execute_transaction(tx_params)
-                print(f"Executing Flag for {token_symbol}")
-                print(f"TX: {tx_token}")
-                time.sleep(1)
+                logger.debug(f"Executing Flag for {token_symbol}")
+                logger.debug(f"TX: {tx_token}")
+                # time.sleep(1)
                 return tx_token
             else:
                 return {"token": token_symbol.upper(), "tx_data": tx_params}
@@ -681,9 +694,9 @@ class Kwenta:
             tx_params["data"] = data_tx
             if execute_now:
                 tx_token = self.execute_transaction(tx_params)
-                print(f"Executing Flag for {token_symbol}")
-                print(f"TX: {tx_token}")
-                time.sleep(1)
+                logger.debug(f"Executing Flag for {token_symbol}")
+                logger.debug(f"TX: {tx_token}")
+                # time.sleep(1)
                 return tx_token
             else:
                 return {"token": token_symbol.upper(), "tx_data": tx_params}
@@ -805,7 +818,7 @@ class Kwenta:
         """
         if leverage_multiplier is not None:
             if leverage_multiplier > 24.7 or leverage_multiplier < 0.1:
-                print("Leveraged_multiplier must be within the range 0.1 - 24.7!")
+                logger.debug("Leveraged_multiplier must be within the range 0.1 - 24.7!")
                 return None
         if wallet_address is None:
             wallet_address = self.sm_account
@@ -813,13 +826,13 @@ class Kwenta:
             self.get_current_position(token_symbol, wallet_address=wallet_address)
         )["margin"]
         asset_price = self.get_current_asset_price(token_symbol)
-        # print(f"SUSD Available: {margin}")
-        # print(f"Current Asset Price: {asset_price['usd']}")
+        # logger.debug(f"SUSD Available: {margin}")
+        # logger.debug(f"Current Asset Price: {asset_price['usd']}")
         # Using 24.7 to cover edge cases
         max_leverage = self.web3.to_wei(
             (margin / asset_price["usd"]) * Decimal(24.7), "ether"
         )
-        # print(f"Max Leveraged Asset Amount: {max_leverage}")
+        # logger.debug(f"Max Leveraged Asset Amount: {max_leverage}")
         leveraged_amount = (margin / asset_price["wei"]) * leverage_multiplier
         return {
             "leveraged_amount": leveraged_amount,
@@ -843,9 +856,9 @@ class Kwenta:
             tx_params = self._get_tx_params(to=self.web3.to_checksum_address(addresses["sUSD"][self.network_id]))
         tx_params["data"] = data_tx
         tx_params["gas"] = 1500000
-        print(f"Approving sUSD: {susd_amount}")
+        logger.debug(f"Approving sUSD: {susd_amount}")
         tx_token = self.execute_transaction(tx_params)
-        print(f"TX: {tx_token}")
+        logger.debug(f"TX: {tx_token}")
         return tx_token
 
     def withdrawal_margin(
@@ -872,22 +885,20 @@ class Kwenta:
         ----------
         str: token transfer Tx id
         """
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(self.sm_account), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
         if token_amount == 0:
             raise Exception("token_amount Cannot be 0.")
 
         current_position = self.get_current_position(
             token_symbol, wallet_address=self.sm_account
         )["margin"]
-        print(f"Current Position: {current_position}")
+        logger.debug(f"Current Position: {current_position}")
         if token_amount < current_position:
             is_withdrawal = -1
             token_amount = self.web3.to_wei(abs(token_amount), "ether") * is_withdrawal
             if execute_now:
                 if token_amount < 0:
-                    print(f"Withdrawal sUSD to {token_symbol} Market.")
+                    logger.debug(f"Withdrawal sUSD to {token_symbol} Market.")
                     if withdrawal_all:
                         commandBytes = encode(
                             ["address"],
@@ -922,7 +933,7 @@ class Kwenta:
             else:
                 return {"token_amount": token_amount / (10 ** 18), "tx_data": tx_params}
         else:
-            print(
+            logger.debug(
                 f"Token amount must be less than Current Position: {current_position}"
             )
 
@@ -930,7 +941,7 @@ class Kwenta:
             self,
             token_symbol: str,
             token_amount: int,
-            skip_approval: bool = False,
+            skip_approval: bool = True,
             withdrawal_all: bool = False,
             execute_now: bool = False,
             nonce: int = -1,
@@ -951,20 +962,18 @@ class Kwenta:
         ----------
         str: token transfer Tx id
         """
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(self.sm_account), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
         if token_amount == 0:
             raise Exception("token_amount Cannot be 0.")
         # Check for withdrawal
         is_withdrawal = -1 if token_amount < 0 else 1
         token_amount = self.web3.to_wei(abs(token_amount), "ether") * is_withdrawal
-        print(token_amount)
+        logger.debug(token_amount)
         if is_withdrawal > 0:
             susd_balance = self.get_susd_balance(self.wallet_address)
         else:
             susd_balance = self.get_susd_balance(self.sm_account)
-        print(f"sUSD Balance: {susd_balance['balance_usd']}")
+        logger.debug(f"sUSD Balance: {susd_balance['balance_usd']}")
         # check that withdrawal is less than account balance
         if (token_amount > susd_balance["balance"]):
             raise Exception(
@@ -973,13 +982,13 @@ class Kwenta:
         if (is_withdrawal > 0):
             if (token_amount > 0) and (skip_approval is False):
                 self.approve_susd(token_amount)
-                print("Waiting for Approval...")
+                logger.debug("Waiting for Approval...")
                 time.sleep(4.5)
             # adding to sm account
             if token_amount > 0:
-                print(f"Adding sUSD to {token_symbol} Market.")
-                time.sleep(4.5)
-                print(
+                logger.debug(f"Adding sUSD to {token_symbol} Market.")
+                # time.sleep(4.5)
+                logger.debug(
                     f"Market_address: {(self.markets[token_symbol.upper()]['market_address'])}"
                 )
                 commandBytes1 = encode(["int256"], [token_amount])
@@ -1003,8 +1012,8 @@ class Kwenta:
                 )
                 if execute_now:
                     tx_token = self.execute_transaction(tx_params)
-                    print(f"Adding {token_amount} sUSD to Account.")
-                    print(f"TX: {tx_token}")
+                    logger.debug(f"Adding {token_amount} sUSD to Account.")
+                    logger.debug(f"TX: {tx_token}")
                     return tx_token
                 else:
                     return {
@@ -1032,8 +1041,8 @@ class Kwenta:
             )
             if execute_now:
                 tx_token = self.execute_transaction(tx_params)
-                print(f"Adding {token_amount} sUSD Moved to EOA Account.")
-                print(f"TX: {tx_token}")
+                logger.debug(f"Adding {token_amount} sUSD Moved to EOA Account.")
+                logger.debug(f"TX: {tx_token}")
                 return tx_token
             else:
                 return {
@@ -1046,7 +1055,6 @@ class Kwenta:
             self,
             token_symbol: str,
             position_size: float,
-            wallet_address: str,
             slippage: float = DEFAULT_SLIPPAGE,
             execute_now: bool = False,
             self_execute: bool = False,
@@ -1073,9 +1081,7 @@ class Kwenta:
         ----------
         str: token transfer Tx id
         """
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(wallet_address), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
         is_short = -1 if position_size < 0 else 1
         position_size = self.web3.to_wei(abs(position_size), "ether") * is_short
         current_position = self.get_current_position(token_symbol)
@@ -1084,7 +1090,7 @@ class Kwenta:
             current_price["wei"] + current_price["wei"] * (slippage / 100) * is_short
         )
 
-        print(f"Current Position Size: {current_position['size']}")
+        logger.debug(f"Current Position Size: {current_position['size']}")
         commandBytes = encode(
             ["address", "int256", "int256"],
             [
@@ -1101,10 +1107,10 @@ class Kwenta:
         else:
             tx_params = self._get_tx_params(to=self.sm_account, value=0)
         tx_params["data"] = data_tx
-        print(f"Updating Position by {position_size}")
+        logger.debug(f"Updating Position by {position_size}")
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
-            print(f"TX: {tx_token}")
+            logger.debug(f"TX: {tx_token}")
 
             if self_execute:
                 self._wait_and_execute(tx_token, token_symbol)
@@ -1119,7 +1125,6 @@ class Kwenta:
     def close_position(
             self,
             token_symbol: str,
-            wallet_address: str,
             slippage: float = DEFAULT_SLIPPAGE,
             execute_now: bool = False,
             self_execute: bool = False,
@@ -1146,16 +1151,14 @@ class Kwenta:
         """
         current_position = self.get_current_position(token_symbol)
         current_price = self.get_current_asset_price(token_symbol)
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(wallet_address), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
         is_short = -1 if -current_position["size"] < 0 else 1
         desired_fill_price = int(
             current_price["wei"] + current_price["wei"] * (slippage / 100) * is_short
         )
-        print(f"Current Position Size: {current_position['size']}")
+        logger.debug(f"Current Position Size: {current_position['size']}")
         if current_position["size"] == 0:
-            print("Not in position!")
+            logger.debug("Not in position!")
             return None
         # Flip position size to the opposite direction
         # Execute Commands: https://github.com/Kwenta/smart-margin/wiki/Commands
@@ -1177,8 +1180,8 @@ class Kwenta:
         tx_params["data"] = data_tx
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
-            print(f"Closing Position by {-current_position['size']}")
-            print(f"TX: {tx_token}")
+            logger.debug(f"Closing Position by {-current_position['size']}")
+            logger.debug(f"TX: {tx_token}")
             if self_execute:
                 self._wait_and_execute(tx_token, token_symbol)
 
@@ -1230,23 +1233,21 @@ class Kwenta:
         str: token transfer Tx id
         """
         if (position_size is None) and (leverage_multiplier is None):
-            print("Enter EITHER a position_size or a leverage_multiplier!")
+            logger.debug("Enter EITHER a position_size or a leverage_multiplier!")
             return None
         elif (position_size is not None) and (leverage_multiplier is not None):
-            print("Enter EITHER a position_size or a leverage_multiplier!")
+            logger.debug("Enter EITHER a position_size or a leverage_multiplier!")
             return None
 
         current_position = self.get_current_position(
             token_symbol, wallet_address=wallet_address
         )
         current_price = self.get_current_asset_price(token_symbol)
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(wallet_address), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
         # starting at zero otherwise use Update position
         if current_position["size"] != 0:
-            print(f"You are already in a position, use modify_position() instead.")
-            print(
+            logger.debug(f"You are already in a position, use modify_position() instead.")
+            logger.debug(
                 f"Current Position Size: {self.web3.from_wei(current_position['size'], 'ether')}"
             )
             return None
@@ -1263,7 +1264,7 @@ class Kwenta:
             if (short == True and position_size > 0) or (
                     short == False and position_size < 0
             ):
-                print(
+                logger.debug(
                     "Position size and Short value do not line up. Double Check intention."
                 )
                 return None
@@ -1298,8 +1299,8 @@ class Kwenta:
 
             if execute_now:
                 tx_token = self.execute_transaction(tx_params)
-                print(f"Updating Position by {position_size}")
-                print(f"TX: {tx_token}")
+                logger.debug(f"Updating Position by {position_size}")
+                logger.debug(f"TX: {tx_token}")
                 if self_execute:
                     self._wait_and_execute(tx_token, token_symbol)
                 return tx_token
@@ -1334,12 +1335,10 @@ class Kwenta:
         if account is None:
             account = self.sm_account
         delayed_order = self.check_delayed_orders(token_symbol)
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(account), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
 
         if not delayed_order["is_open"]:
-            print("No open order")
+            logger.debug("No open order")
             return None
 
         # Execute Commands: https://github.com/Kwenta/smart-margin/wiki/Commands
@@ -1357,8 +1356,8 @@ class Kwenta:
         tx_params["data"] = data_tx
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
-            print(f"Cancelling order for {token_symbol}")
-            print(f"TX: {tx_token}")
+            logger.debug(f"Cancelling order for {token_symbol}")
+            logger.debug(f"TX: {tx_token}")
             return tx_token
         else:
             return {"token": token_symbol.upper(), "tx_data": tx_params}
@@ -1395,7 +1394,7 @@ class Kwenta:
         delayed_order = self.check_delayed_orders(token_symbol, account)
 
         if not delayed_order["is_open"]:
-            print("No open order")
+            logger.debug("No open order")
             return None
 
         if pyth_feed_data is None:
@@ -1417,21 +1416,21 @@ class Kwenta:
 
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
-            print(f"Executing order for {token_symbol}")
-            print(f"TX: {tx_token}")
+            logger.debug(f"Executing order for {token_symbol}")
+            logger.debug(f"TX: {tx_token}")
             return tx_token
         elif gas_price is not None:
             tx_params["gasPrice"] = gas_price
             tx_token = self.execute_transaction(tx_params)
-            print(f"Executing order for {token_symbol}")
-            print(f"TX: {tx_token}")
+            logger.debug(f"Executing order for {token_symbol}")
+            logger.debug(f"TX: {tx_token}")
             return tx_token
         elif estimate_gas:
             try:
                 gas_estimate = self.web3.eth.estimate_gas(tx_params)
                 return gas_estimate
             except Exception as e:
-                print(f"Error estimating gas: {e}")
+                logger.debug(f"Error estimating gas: {e}")
                 return None
         else:
             return {"token": token_symbol.upper(), "tx_data": tx_params}
@@ -1459,7 +1458,7 @@ class Kwenta:
         delayed_order = self.check_delayed_orders(token_symbol)
 
         # wait until executable
-        print("Waiting until order is executable")
+        logger.debug("Waiting until order is executable")
         time.sleep(delayed_order["executable_time"] - time.time())
 
         # set up the estimate
@@ -1473,17 +1472,17 @@ class Kwenta:
             if gas_estimate is not None:
                 break
 
-            print(f"Gas estimation failed, retrying in {retry_interval} seconds...")
+            logger.debug(f"Gas estimation failed, retrying in {retry_interval} seconds...")
             time.sleep(retry_interval)
             attempt += 1
 
         # If gas estimation is successful, execute the order
         if gas_estimate:
-            print(f"Gas estimate for executing order: {gas_estimate}")
+            logger.debug(f"Gas estimate for executing order: {gas_estimate}")
             tx_execute = self.execute_order(token_symbol, execute_now=True)
-            print(f"Executing tx: {tx_execute}")
+            logger.debug(f"Executing tx: {tx_execute}")
         else:
-            print(
+            logger.debug(
                 "Gas estimation failed after multiple retries, not executing the order."
             )
 
@@ -1509,11 +1508,11 @@ class Kwenta:
 
         # if no order, exit
         if not delayed_order["is_open"]:
-            print("No delayed order open")
+            logger.debug("No delayed order open")
             return
 
         # wait until executable
-        print("Waiting until order is executable")
+        logger.debug("Waiting until order is executable")
         await asyncio.sleep(delayed_order["executable_time"] - time.time())
 
         # set up the estimate
@@ -1529,19 +1528,19 @@ class Kwenta:
             if gas_estimate is not None:
                 break
 
-            print(f"Gas estimation failed, retrying in {retry_interval} seconds...")
+            logger.debug(f"Gas estimation failed, retrying in {retry_interval} seconds...")
             await asyncio.sleep(retry_interval)
             attempt += 1
 
         # If gas estimation is successful, execute the order
         if gas_estimate:
-            print(f"Gas estimate for executing order: {gas_estimate}")
+            logger.debug(f"Gas estimate for executing order: {gas_estimate}")
             tx_execute = self.execute_order(
                 token_symbol, account=wallet_address, execute_now=True
             )
-            print(f"Executing tx: {tx_execute}")
+            logger.debug(f"Executing tx: {tx_execute}")
         else:
-            print(
+            logger.debug(
                 "Gas estimation failed after multiple retries, not executing the order."
             )
 
@@ -1584,18 +1583,18 @@ class Kwenta:
         if wallet_address is None:
             wallet_address = self.sm_account
         if (position_size is None) and (leverage_multiplier is None):
-            print("Enter EITHER a position amount or a leverage multiplier!")
+            logger.debug("Enter EITHER a position amount or a leverage multiplier!")
             return None
         elif (position_size is not None) and (leverage_multiplier is not None):
-            print("Enter EITHER a position amount or a leverage multiplier!")
+            logger.debug("Enter EITHER a position amount or a leverage multiplier!")
             return None
 
         current_position = self.get_current_position(token_symbol)
         current_price = self.get_current_asset_price(token_symbol)
 
         if current_position["size"] != 0:
-            print(f"You are already in a position, use modify_position() instead.")
-            print(
+            logger.debug(f"You are already in a position, use modify_position() instead.")
+            logger.debug(
                 f"Current Position Size: {self.web3.from_wei(current_position['size'], 'ether')}"
             )
             return None
@@ -1650,7 +1649,7 @@ class Kwenta:
                         execute_now=execute_now,
                         nonce=nonce,
                     )
-        print(
+        logger.debug(
             f"Limit not reached current : {current_price} | Entry: {current_position['last_price'] / (10 ** 18)} | Limit: {limit_price}"
         )
         return None
@@ -1687,7 +1686,7 @@ class Kwenta:
 
         # Check if you are in Position
         if current_position["size"] == 0:
-            print("Not in position!")
+            logger.debug("Not in position!")
             return None
 
         short = True if current_position["size"] < 0 else False
@@ -1709,7 +1708,7 @@ class Kwenta:
                     execute_now=execute_now,
                     nonce=nonce,
                 )
-        print(
+        logger.debug(
             f"Limit not reached current : {current_price['usd']} | Entry: {current_position['last_price'] / (10 ** 18)} | Limit: {limit_price}"
         )
         return None
@@ -1746,7 +1745,7 @@ class Kwenta:
         current_price = self.get_current_asset_price(token_symbol)
         # Check if you are in Position
         if current_position["size"] == 0:
-            print("Not in position!")
+            logger.debug("Not in position!")
             return None
 
         short = True if current_position["size"] < 0 else False
@@ -1768,7 +1767,7 @@ class Kwenta:
                 return self.close_position(
                     token_symbol, wallet_address, slippage=slippage
                 )
-        print(
+        logger.debug(
             f"Limit not reached current : {current_price['usd']} | Entry: {current_position['last_price'] / (10 ** 18)} | Limit: {limit_price} | Stop Limit: {stop_price}"
         )
         return None
@@ -1799,9 +1798,8 @@ class Kwenta:
 
         if wallet_address is None:
             wallet_address = self.sm_account
-        sm_account_contract = self.web3.eth.contract(
-            self.web3.to_checksum_address(self.sm_account), abi=abis["SM_Account"]
-        )
+        sm_account_contract = self.sm_account_contract
+        tx_params = {}
         if execute_now:
             command_ids = []
             command_data = []
