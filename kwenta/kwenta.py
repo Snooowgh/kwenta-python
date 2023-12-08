@@ -1033,6 +1033,56 @@ class Kwenta:
                     "tx_data": tx_params,
                 }
 
+    def open_new_position(
+            self,
+            token_symbol: str,
+            position_size: float,
+            margin_delta: float,
+            desired_fill_price: float,
+            execute_now: bool = False,
+            self_execute: bool = False,
+            nonce: int = -1,
+    ) -> str:
+        sm_account_contract = self.sm_account_contract
+        position_size = int(position_size * 10 ** 18)
+        desired_fill_price = int(desired_fill_price * 10 ** 18)
+        margin_delta = int(margin_delta * 10 ** 18)
+        marginCommandBytes = encode(
+            ["address", "int256"],
+            [
+                (TOKEN_MARKET_ADDRESS_MAP[token_symbol]),
+                margin_delta
+            ],
+        )
+        commandBytes = encode(
+            ["address", "int256", "uint256"],
+            [
+                (TOKEN_MARKET_ADDRESS_MAP[token_symbol]),
+                position_size,
+                desired_fill_price,
+            ],
+        )
+        data_tx = sm_account_contract.encodeABI(
+            fn_name="execute", args=[[2, 6], [marginCommandBytes, commandBytes]]
+        )
+        if nonce != -1:
+            tx_params = self._get_tx_params(to=self.sm_account, value=0, nonce=nonce)
+        else:
+            tx_params = self._get_tx_params(to=self.sm_account, value=0)
+        tx_params["data"] = data_tx
+        logger.debug(f"Opening Position by {position_size} {margin_delta}")
+        if execute_now:
+            tx_token = self.execute_transaction(tx_params)
+            logger.debug(f"TX: {tx_token}")
+            if self_execute:
+                self._wait_and_execute(tx_token, token_symbol)
+            return tx_token
+        else:
+            return {
+                "token": token_symbol.upper(),
+                "tx_data": tx_params,
+            }
+
     def modify_position(
             self,
             token_symbol: str,
@@ -1098,7 +1148,7 @@ class Kwenta:
     def close_position(
             self,
             token_symbol: str,
-            slippage: float = DEFAULT_SLIPPAGE,
+            desired_fill_price: float,
             execute_now: bool = False,
             self_execute: bool = False,
             nonce: int = -1,
@@ -1122,20 +1172,7 @@ class Kwenta:
         ----------
         str: token transfer Tx id
         """
-        current_position = self.get_current_position(token_symbol)
-        current_price = self.get_current_asset_price(token_symbol)
         sm_account_contract = self.sm_account_contract
-        is_short = -1 if -current_position["size"] < 0 else 1
-        desired_fill_price = int(
-            current_price["wei"] + current_price["wei"] * (slippage / 100) * is_short
-        )
-        logger.debug(f"Current Position Size: {current_position['size']}")
-        if current_position["size"] == 0:
-            logger.debug("Not in position!")
-            return None
-        # Flip position size to the opposite direction
-        # Execute Commands: https://github.com/Kwenta/smart-margin/wiki/Commands
-        # args[0] == Command ID, args[1] == command inputs, in bytes
         commandBytes = encode(
             ["address", "int256"],
             [
@@ -1153,7 +1190,7 @@ class Kwenta:
         tx_params["data"] = data_tx
         if execute_now:
             tx_token = self.execute_transaction(tx_params)
-            logger.debug(f"Closing Position by {-current_position['size']}")
+            logger.debug(f"Closing Position at price {desired_fill_price}")
             logger.debug(f"TX: {tx_token}")
             if self_execute:
                 self._wait_and_execute(tx_token, token_symbol)
@@ -1162,7 +1199,6 @@ class Kwenta:
         else:
             return {
                 "token": token_symbol.upper(),
-                "current_position": current_position["size"],
                 "tx_data": tx_params,
             }
 
