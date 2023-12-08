@@ -1177,7 +1177,7 @@ class Kwenta:
             ["address", "int256"],
             [
                 TOKEN_MARKET_ADDRESS_MAP[token_symbol],
-                desired_fill_price,
+                int(desired_fill_price * 10 ** 18),
             ],
         )
         data_tx = sm_account_contract.encodeABI(
