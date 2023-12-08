@@ -971,13 +971,13 @@ class Kwenta:
                 logger.debug(f"Adding sUSD to {token_symbol} Market.")
                 # time.sleep(4.5)
                 logger.debug(
-                    f"Market_address: {(self.markets[token_symbol.upper()]['market_address'])}"
+                    f"Market_address: {TOKEN_MARKET_ADDRESS_MAP[token_symbol]}"
                 )
                 commandBytes1 = encode(["int256"], [token_amount])
                 commandBytes2 = encode(
                     ["address", "int256"],
                     [
-                        str(self.markets[token_symbol.upper()]["market_address"]),
+                        TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                         token_amount,
                     ],
                 )
@@ -1050,14 +1050,14 @@ class Kwenta:
         marginCommandBytes = encode(
             ["address", "int256"],
             [
-                (TOKEN_MARKET_ADDRESS_MAP[token_symbol]),
+                TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                 margin_delta
             ],
         )
         commandBytes = encode(
             ["address", "int256", "uint256"],
             [
-                (TOKEN_MARKET_ADDRESS_MAP[token_symbol]),
+                TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                 position_size,
                 desired_fill_price,
             ],
@@ -1119,7 +1119,7 @@ class Kwenta:
         commandBytes = encode(
             ["address", "int256", "uint256"],
             [
-                (TOKEN_MARKET_ADDRESS_MAP[token_symbol]),
+                TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                 position_size,
                 desired_fill_price,
             ],
@@ -1176,7 +1176,7 @@ class Kwenta:
         commandBytes = encode(
             ["address", "int256"],
             [
-                (self.markets[token_symbol.upper()]["market_address"]),
+                TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                 desired_fill_price,
             ],
         )
@@ -1292,7 +1292,7 @@ class Kwenta:
             commandBytes = encode(
                 ["address", "int256", "int256"],
                 [
-                    (self.markets[token_symbol.upper()]["market_address"]),
+                    TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                     position_size,
                     desired_fill_price,
                 ],
@@ -1353,7 +1353,7 @@ class Kwenta:
         # Execute Commands: https://github.com/Kwenta/smart-margin/wiki/Commands
         # args[0] == Command ID, args[1] == command inputs, in bytes
         commandBytes = encode(
-            ["address"], [(self.markets[token_symbol.upper()]["market_address"])]
+            ["address"], [TOKEN_MARKET_ADDRESS_MAP[token_symbol]]
         )
         data_tx = sm_account_contract.encodeABI(
             fn_name="execute", args=[[1], [commandBytes]]
