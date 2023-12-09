@@ -1541,8 +1541,8 @@ class Kwenta:
             return None
         tx_params["gasPrice"] = gas_price
         tx_token = self.execute_transaction(tx_params)
-        logger.info(f"Executing order for {token_symbol}")
-        logger.info(f"TX: {tx_token}")
+        print(f"Executing order for {token_symbol}")
+        print(f"TX: {tx_token}")
         return tx_token
 
     async def execute_offchain_order_for_address(
@@ -1558,16 +1558,16 @@ class Kwenta:
 
         # if no order, exit
         if not delayed_order["is_open"]:
-            logger.info("No delayed order open")
+            print("No delayed order open")
             return
 
         # wait until executable
-        logger.info("Waiting until order is executable")
+        print("Waiting until order is executable")
         sleep_time = delayed_order["executable_time"] - time.time() - 2 * retry_interval
         if sleep_time > 0:
             await asyncio.sleep(sleep_time)
         else:
-            logger.info("order expired")
+            print("order expired")
             return None
 
         # Retry gas estimation multiple times
@@ -1576,9 +1576,9 @@ class Kwenta:
                 token_symbol, account=wallet_address, nonce=nonce
             )
             if tx:
-                logger.info(f"Executing tx: {tx}")
+                print(f"Executing tx: {tx}")
                 return tx
-        logger.info(
+        print(
             "Gas estimation failed after multiple retries, not executing the order."
         )
         return None
