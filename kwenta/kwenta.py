@@ -1496,8 +1496,95 @@ class Kwenta:
                 "Gas estimation failed after multiple retries, not executing the order."
             )
 
+    def execute_order_if_ok(
+            self,
+            token_symbol: str,
+            account: str = None,
+            nonce: int = -1,
+    ) -> str:
+        """
+        Executes an open order
+        ...
+
+        Attributes
+        ----------
+        account : str
+            address of the account to execute. (defaults to connected wallet)
+        token_symbol : str
+            token symbol from list of supported asset
+
+        Returns
+        ----------
+        str: transaction hash for executing the order
+        """
+        if not account:
+            account = self.wallet_address
+        gas_price = self.web3.eth.gas_price * 1.02
+        market_contract = self.get_market_contract(token_symbol)
+        pyth_feed_data = self.pyth.price_update_data(token_symbol)
+
+        if not pyth_feed_data:
+            raise Exception("Failed to get price update data from price service")
+
+        data_tx = market_contract.encodeABI(
+            fn_name="executeOffchainDelayedOrder", args=[account, [pyth_feed_data]]
+        )
+        if nonce != -1:
+            tx_params = self._get_tx_params(to=market_contract.address, value=1, nonce=nonce)
+        else:
+            tx_params = self._get_tx_params(to=market_contract.address, value=1)
+
+        tx_params["data"] = data_tx
+        try:
+            gas_estimate = self.web3.eth.estimate_gas(tx_params)
+        except:
+            return None
+        tx_params["gasPrice"] = gas_price
+        tx_token = self.execute_transaction(tx_params)
+        logger.info(f"Executing order for {token_symbol}")
+        logger.info(f"TX: {tx_token}")
+        return tx_token
+
+    async def execute_offchain_order_for_address(
+            self, token_symbol, wallet_address, retry_interval=0.02
+    ):
+        if not wallet_address:
+            wallet_address = self.wallet_address
+        nonce = self.web3.eth.get_transaction_count(
+            wallet_address
+        )
+        # check delayed orders
+        delayed_order = self.check_delayed_orders(token_symbol, wallet_address)
+
+        # if no order, exit
+        if not delayed_order["is_open"]:
+            logger.info("No delayed order open")
+            return
+
+        # wait until executable
+        logger.info("Waiting until order is executable")
+        sleep_time = delayed_order["executable_time"] - time.time() - 2 * retry_interval
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)
+        else:
+            logger.info("order expired")
+            return None
+
+        # Retry gas estimation multiple times
+        for _ in range(3):
+            tx = self.execute_order_if_ok(
+                token_symbol, account=wallet_address, nonce=nonce
+            )
+            if tx:
+                logger.info(f"Executing tx: {tx}")
+                return tx
+        logger.info(
+            "Gas estimation failed after multiple retries, not executing the order."
+        )
+        return None
+
     async def execute_for_address(
-            self, token_symbol, wallet_address, retries=5, retry_interval=1
+            self, token_symbol, wallet_address, retries=5, retry_interval=0.02
     ):
         """
         Check an addresses delayed orders and execute the order when executable
@@ -1518,12 +1605,12 @@ class Kwenta:
 
         # if no order, exit
         if not delayed_order["is_open"]:
-            logger.debug("No delayed order open")
+            logger.info("No delayed order open")
             return
 
         # wait until executable
-        logger.debug("Waiting until order is executable")
-        await asyncio.sleep(delayed_order["executable_time"] - time.time())
+        logger.info("Waiting until order is executable")
+        await asyncio.sleep(delayed_order["executable_time"] - time.time() - 2 * retry_interval)
 
         # set up the estimate
         gas_estimate = None
@@ -1538,7 +1625,7 @@ class Kwenta:
             if gas_estimate is not None:
                 break
 
-            logger.debug(f"Gas estimation failed, retrying in {retry_interval} seconds...")
+            logger.info(f"Gas estimation failed, retrying in {retry_interval} seconds...")
             await asyncio.sleep(retry_interval)
             attempt += 1
 
@@ -1548,7 +1635,7 @@ class Kwenta:
             tx_execute = self.execute_order(
                 token_symbol, account=wallet_address, execute_now=True
             )
-            logger.debug(f"Executing tx: {tx_execute}")
+            logger.info(f"Executing tx: {tx_execute}")
         else:
             logger.debug(
                 "Gas estimation failed after multiple retries, not executing the order."
