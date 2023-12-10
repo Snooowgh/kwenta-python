@@ -1552,33 +1552,33 @@ class Kwenta:
         return tx_token
 
     async def execute_offchain_order_for_address(
-            self, token_symbol, wallet_address, retry_interval=0.02
+            self, token_symbol, wallet_address, nonce
     ):
         if not wallet_address:
             wallet_address = self.wallet_address
-        nonce = self.web3.eth.get_transaction_count(
-            wallet_address
-        )
-        # check delayed orders
-        delayed_order = self.check_delayed_orders(token_symbol, wallet_address)
-
-        # if no order, exit
-        if not delayed_order["is_open"]:
-            print("No delayed order open")
-            return
-
-        # wait until executable
-        print("Waiting until order is executable")
-        if token_symbol in ["BTC", "ETH"]:
-            delay = 1
-        else:
-            delay = 2
-        sleep_time = delayed_order["intention_time"] + delay - time.time() - 2 * retry_interval
-        if sleep_time > 0:
-            await asyncio.sleep(sleep_time)
-        else:
-            print("order expired intention time")
-            return None
+        # nonce = self.web3.eth.get_transaction_count(
+        #     wallet_address
+        # )
+        # # check delayed orders
+        # delayed_order = self.check_delayed_orders(token_symbol, wallet_address)
+        #
+        # # if no order, exit
+        # if not delayed_order["is_open"]:
+        #     print("No delayed order open")
+        #     return
+        #
+        # # wait until executable
+        # print("Waiting until order is executable")
+        # if token_symbol in ["BTC", "ETH"]:
+        #     delay = 1
+        # else:
+        #     delay = 2
+        # sleep_time = delayed_order["intention_time"] + delay - time.time() - 2 * retry_interval
+        # if sleep_time > 0:
+        #     await asyncio.sleep(sleep_time)
+        # else:
+        #     print("order expired intention time")
+        #     return None
 
         # Retry gas estimation multiple times
         for _ in range(3):
