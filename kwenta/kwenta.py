@@ -396,7 +396,7 @@ class Kwenta:
             "position_size": delayed_order[1],
             "desired_fill_price": delayed_order[2],
             "intention_time": int(delayed_order[7]),
-            "executable_time": int(delayed_order[7]) + 15
+            "executable_time": int(delayed_order[7]) + 2
             if int(delayed_order[7]) > 0
             else 0,
         }
@@ -1569,7 +1569,11 @@ class Kwenta:
 
         # wait until executable
         print("Waiting until order is executable")
-        sleep_time = delayed_order["intention_time"] - time.time() - 2 * retry_interval
+        if token_symbol in ["BTC", "ETH"]:
+            delay = 1
+        else:
+            delay = 2
+        sleep_time = delayed_order["intention_time"] + delay - time.time() - 2 * retry_interval
         if sleep_time > 0:
             await asyncio.sleep(sleep_time)
         else:
