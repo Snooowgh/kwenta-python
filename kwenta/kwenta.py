@@ -1592,6 +1592,9 @@ class Kwenta:
                 if "no previous order" in str(e):
                     print("订单已被其他人执行..")
                     break
+                if "price not updated" in str(e):
+                    print("价格数据未更新..")
+                    break
                 else:
                     print(e)
                     continue
