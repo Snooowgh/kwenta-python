@@ -346,7 +346,7 @@ class Kwenta:
         else:
             return self.market_contracts[token_symbol.upper()]
 
-    def execute_transaction(self, tx_data: dict):
+    def execute_transaction(self, tx_data: dict, use_estimate_gas=None):
         """
         Execute a transaction given the TX data
         ...
@@ -360,9 +360,11 @@ class Kwenta:
         """
         if self.private_key is None:
             raise Exception("No private key specified.")
+        if use_estimate_gas is None:
+            use_estimate_gas = self.use_estimate_gas
 
         if "gas" not in tx_data:
-            if self.use_estimate_gas:
+            if use_estimate_gas:
                 tx_data["gas"] = int(self.web3.eth.estimate_gas(tx_data) * 1.2)
             else:
                 tx_data["gas"] = 1500000
@@ -857,7 +859,7 @@ class Kwenta:
         tx_params["data"] = data_tx
         tx_params["gas"] = 1500000
         logger.debug(f"Approving sUSD: {susd_amount}")
-        tx_token = self.execute_transaction(tx_params)
+        tx_token = self.execute_transaction(tx_params, use_estimate_gas=True)
         logger.debug(f"TX: {tx_token}")
         return tx_token
 
@@ -875,7 +877,7 @@ class Kwenta:
         tx_params = self._get_tx_params(to=self.sm_account, value=0)
         tx_params["data"] = data_tx
         if execute_now:
-            tx_token = self.execute_transaction(tx_params)
+            tx_token = self.execute_transaction(tx_params, use_estimate_gas=True)
             return tx_token
         else:
             return tx_params
@@ -883,7 +885,7 @@ class Kwenta:
     def withdrawal_margin(
             self,
             token_symbol: str,
-            token_amount: int = 1,
+            token_amount: float,
             execute_now: bool = False
     ):
         """
@@ -907,9 +909,7 @@ class Kwenta:
         commandBytes = encode(
             ["address", "int256"],
             [
-                str(
-                    TOKEN_MARKET_ADDRESS_MAP[token_symbol]
-                ),
+                TOKEN_MARKET_ADDRESS_MAP[token_symbol],
                 token_amount,
             ],
         )
@@ -919,7 +919,7 @@ class Kwenta:
         tx_params = self._get_tx_params(to=self.sm_account, value=0)
         tx_params["data"] = data_tx
         if execute_now:
-            tx_token = self.execute_transaction(tx_params)
+            tx_token = self.execute_transaction(tx_params, use_estimate_gas=True)
             return tx_token
         else:
             return {"token_amount": token_amount / (10 ** 18), "tx_data": tx_params}
@@ -1027,7 +1027,7 @@ class Kwenta:
                 self.wallet_address
             )
             if execute_now:
-                tx_token = self.execute_transaction(tx_params)
+                tx_token = self.execute_transaction(tx_params, use_estimate_gas=True)
                 logger.debug(f"Adding {token_amount} sUSD Moved to EOA Account.")
                 logger.debug(f"TX: {tx_token}")
                 return tx_token
@@ -1369,7 +1369,7 @@ class Kwenta:
             tx_params = self._get_tx_params(to=self.sm_account, value=0)
         tx_params["data"] = data_tx
         if execute_now:
-            tx_token = self.execute_transaction(tx_params)
+            tx_token = self.execute_transaction(tx_params, use_estimate_gas=True)
             logger.debug(f"Cancelling order for {token_symbol}")
             logger.debug(f"TX: {tx_token}")
             return tx_token
