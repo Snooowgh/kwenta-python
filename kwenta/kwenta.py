@@ -1569,11 +1569,11 @@ class Kwenta:
 
         # wait until executable
         print("Waiting until order is executable")
-        sleep_time = delayed_order["executable_time"] - time.time() - 2 * retry_interval
+        sleep_time = delayed_order["intention_time"] - time.time() - 2 * retry_interval
         if sleep_time > 0:
             await asyncio.sleep(sleep_time)
         else:
-            print("order expired")
+            print("order expired intention time")
             return None
 
         # Retry gas estimation multiple times
