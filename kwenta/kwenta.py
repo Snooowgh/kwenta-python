@@ -1525,7 +1525,11 @@ class Kwenta:
             try:
                 gas_estimate = self.web3.eth.estimate_gas(tx_params)
             except Exception as e:
-                raise e
+                if "executability not reached" in str(e):
+                    tx_token = self.execute_transaction(tx_params)
+                    return tx_token
+                else:
+                    raise e
         tx_token = self.execute_transaction(tx_params)
         print(f"TX: {tx_token}")
         return tx_token
