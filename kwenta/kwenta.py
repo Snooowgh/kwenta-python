@@ -1503,9 +1503,8 @@ class Kwenta:
 
     def execute_order_if_ok(
             self,
-            token_symbol: str,
-            account: str = None,
-            nonce: int = -1,
+            tx_params,
+            use_estimate=True
     ) -> str:
         """
         Executes an open order
@@ -1522,32 +1521,12 @@ class Kwenta:
         ----------
         str: transaction hash for executing the order
         """
-        if not account:
-            account = self.wallet_address
-        gas_price = 12000000
-        market_contract = self.get_market_contract(token_symbol)
-        pyth_feed_data = self.pyth.price_update_data(token_symbol)
-
-        if not pyth_feed_data:
-            raise Exception("Failed to get price update data from price service")
-
-        data_tx = market_contract.encodeABI(
-            fn_name="executeOffchainDelayedOrder", args=[account, [pyth_feed_data]]
-        )
-        if nonce != -1:
-            tx_params = self._get_tx_params(to=market_contract.address, value=1, nonce=nonce)
-        else:
-            tx_params = self._get_tx_params(to=market_contract.address, value=1)
-
-        tx_params["data"] = data_tx
-        try:
-            gas_estimate = self.web3.eth.estimate_gas(tx_params)
-        except Exception as e:
-            print(f"估算gas失败: {e}")
-            return None
-        tx_params["gasPrice"] = gas_price
+        if use_estimate:
+            try:
+                gas_estimate = self.web3.eth.estimate_gas(tx_params)
+            except Exception as e:
+                raise e
         tx_token = self.execute_transaction(tx_params)
-        print(f"Executing order for {token_symbol}")
         print(f"TX: {tx_token}")
         return tx_token
 
@@ -1581,13 +1560,37 @@ class Kwenta:
         #     return None
 
         # Retry gas estimation multiple times
+        market_contract = self.get_market_contract(token_symbol)
+        pyth_feed_data = self.pyth.price_update_data(token_symbol)
+
+        if not pyth_feed_data:
+            raise Exception("Failed to get price update data from price service")
+
+        data_tx = market_contract.encodeABI(
+            fn_name="executeOffchainDelayedOrder", args=[wallet_address, [pyth_feed_data]]
+        )
+        if nonce != -1:
+            tx_params = self._get_tx_params(to=market_contract.address, value=1, nonce=nonce)
+        else:
+            tx_params = self._get_tx_params(to=market_contract.address, value=1)
+        tx_params["gasPrice"] = 12000000
+        tx_params["data"] = data_tx
         for _ in range(3):
-            tx = self.execute_order_if_ok(
-                token_symbol, account=wallet_address, nonce=nonce
-            )
-            if tx:
-                print(f"Executing tx: {tx}")
-                return tx
+            try:
+                tx = self.execute_order_if_ok(
+                    tx_params,
+                    use_estimate=True
+                )
+                if tx:
+                    print(f"Executing tx: {tx}")
+                    return tx
+            except Exception as e:
+                if "no previous order" in str(e):
+                    print("订单已被其他人执行..")
+                    break
+                else:
+                    print(e)
+                    continue
         print(
             "Gas estimation failed after multiple retries, not executing the order."
         )
