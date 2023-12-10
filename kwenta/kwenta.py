@@ -861,13 +861,30 @@ class Kwenta:
         logger.debug(f"TX: {tx_token}")
         return tx_token
 
+    def withdraw_all_margin(self, token_symbol,
+                            execute_now: bool = False):
+        sm_account_contract = self.sm_account_contract
+        logger.debug(f"Withdrawal sUSD from {token_symbol} Market.")
+        commandBytes = encode(
+            ["address"],
+            [TOKEN_MARKET_ADDRESS_MAP[token_symbol]],
+        )
+        data_tx = sm_account_contract.encodeABI(
+            fn_name="execute", args=[[3], [commandBytes]]
+        )
+        tx_params = self._get_tx_params(to=self.sm_account, value=0)
+        tx_params["data"] = data_tx
+        if execute_now:
+            tx_token = self.execute_transaction(tx_params)
+            return tx_token
+        else:
+            return tx_params
+
     def withdrawal_margin(
             self,
             token_symbol: str,
             token_amount: int = 1,
-            withdrawal_all: bool = False,
-            execute_now: bool = False,
-            nonce: int = -1,
+            execute_now: bool = False
     ):
         """
         Withdrawal SUSD from Margin Market to Wallet
@@ -887,35 +904,23 @@ class Kwenta:
         """
         sm_account_contract = self.sm_account_contract
         token_amount = int(token_amount * 10 ** 18)
-        tx_params = {}
+        commandBytes = encode(
+            ["address", "int256"],
+            [
+                str(
+                    TOKEN_MARKET_ADDRESS_MAP[token_symbol]
+                ),
+                token_amount,
+            ],
+        )
+        data_tx = sm_account_contract.encodeABI(
+            fn_name="execute", args=[[2], [commandBytes]]
+        )
+        tx_params = self._get_tx_params(to=self.sm_account, value=0)
+        tx_params["data"] = data_tx
         if execute_now:
-            if token_amount < 0:
-                logger.debug(f"Withdrawal sUSD from {token_symbol} Market.")
-                if withdrawal_all:
-                    commandBytes = encode(
-                        ["address"],
-                        [TOKEN_MARKET_ADDRESS_MAP[token_symbol]],
-                    )
-                    data_tx = sm_account_contract.encodeABI(
-                        fn_name="execute", args=[[3], [commandBytes]]
-                    )
-                else:
-                    commandBytes = encode(
-                        ["address", "int256"],
-                        [
-                            str(
-                                TOKEN_MARKET_ADDRESS_MAP[token_symbol]
-                            ),
-                            token_amount,
-                        ],
-                    )
-                    data_tx = sm_account_contract.encodeABI(
-                        fn_name="execute", args=[[2], [commandBytes]]
-                    )
-                tx_params = self._get_tx_params(to=self.sm_account, value=0)
-                tx_params["data"] = data_tx
-                tx_token = self.execute_transaction(tx_params)
-                return tx_token
+            tx_token = self.execute_transaction(tx_params)
+            return tx_token
         else:
             return {"token_amount": token_amount / (10 ** 18), "tx_data": tx_params}
 
@@ -1537,7 +1542,8 @@ class Kwenta:
         tx_params["data"] = data_tx
         try:
             gas_estimate = self.web3.eth.estimate_gas(tx_params)
-        except:
+        except Exception as e:
+            print(f"估算gas失败: {e}")
             return None
         tx_params["gasPrice"] = gas_price
         tx_token = self.execute_transaction(tx_params)
