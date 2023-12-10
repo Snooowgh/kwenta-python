@@ -1524,7 +1524,7 @@ class Kwenta:
         """
         if not account:
             account = self.wallet_address
-        gas_price = self.web3.eth.gas_price * 1.02
+        gas_price = 12000000
         market_contract = self.get_market_contract(token_symbol)
         pyth_feed_data = self.pyth.price_update_data(token_symbol)
 
