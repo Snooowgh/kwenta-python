@@ -43,7 +43,8 @@ class Kwenta:
             price_service_endpoint: str = None,
             telegram_token: str = None,
             telegram_channel_name: str = None,
-            fast_marketload: bool = False
+            fast_marketload: bool = False,
+            gas_price_boost=1
     ):
         self.w3 = None
         # set default values
@@ -122,6 +123,10 @@ class Kwenta:
         self.sm_account_contract = self.web3.eth.contract(
             self.web3.to_checksum_address(self.sm_account), abi=abis["SM_Account"]
         )
+        self.gas_price_boost = gas_price_boost
+
+    def set_gas_price_boost(self, new_gas_price_boost):
+        self.gas_price_boost = new_gas_price_boost
 
     def get_sm_account_free_margin(self):
         return self.sm_account_contract.functions.freeMargin().call()
@@ -316,7 +321,7 @@ class Kwenta:
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                "gasPrice": self.web3.eth.gas_price,
+                "gasPrice": int(self.web3.eth.gas_price * self.gas_price_boost),
                 "nonce": nonce,
             }
         # Get Nonce from Chain.
@@ -326,7 +331,7 @@ class Kwenta:
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                "gasPrice": self.web3.eth.gas_price,
+                "gasPrice": int(self.web3.eth.gas_price * self.gas_price_boost),
                 "nonce": self.web3.eth.get_transaction_count(self.wallet_address),
             }
         return params
