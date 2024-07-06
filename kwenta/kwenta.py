@@ -929,6 +929,30 @@ class Kwenta:
         else:
             return {"token_amount": token_amount / (10 ** 18), "tx_data": tx_params}
 
+    def move_margin_between_sm_account(self, is_withdraw):
+        sm_account_contract = self.sm_account_contract
+        if is_withdraw:
+            token_amount = self.get_susd_balance(self.sm_account)["balance"]
+        else:
+            token_amount = self.get_susd_balance(self.wallet_address)["balance"]
+        commandBytes = encode(["int256"], [token_amount])
+        data_tx = sm_account_contract.encodeABI(
+            fn_name="execute", args=[[0], [commandBytes]]
+        )
+        tx_params = self._get_tx_params(to=self.sm_account, value=0)
+        tx_params["data"] = data_tx
+        tx_params["nonce"] = self.web3.eth.get_transaction_count(
+            self.wallet_address
+        )
+        tx_token = self.execute_transaction(tx_params, use_estimate_gas=True)
+        return tx_token
+
+    def deposit_margin_to_sm_account(self):
+        return self.move_margin_between_sm_account(is_withdraw=False)
+
+    def withdraw_margin_to_eoa_account(self):
+        return self.move_margin_between_sm_account(is_withdraw=True)
+
     def transfer_margin(
             self,
             token_symbol: str,
