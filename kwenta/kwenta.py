@@ -1606,7 +1606,7 @@ class Kwenta:
             tx_params = self._get_tx_params(to=market_contract.address, value=1, nonce=nonce)
         else:
             tx_params = self._get_tx_params(to=market_contract.address, value=1)
-        tx_params["gasPrice"] = self.web3.eth.gas_price
+        tx_params["gasPrice"] = int(self.web3.eth.gas_price * self.gas_price_boost)
         tx_params["data"] = data_tx
         for _ in range(3):
             try:
