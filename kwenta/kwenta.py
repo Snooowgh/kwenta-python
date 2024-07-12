@@ -932,7 +932,7 @@ class Kwenta:
     def move_margin_between_sm_account(self, is_withdraw):
         sm_account_contract = self.sm_account_contract
         if is_withdraw:
-            token_amount = self.get_susd_balance(self.sm_account)["balance"]
+            token_amount = -self.get_susd_balance(self.sm_account)["balance"]
         else:
             token_amount = self.get_susd_balance(self.wallet_address)["balance"]
         commandBytes = encode(["int256"], [token_amount])
