@@ -33,10 +33,12 @@ def clean_df(df, config):
 
 
 class Queries:
-    def __init__(self, kwenta, gql_endpoint_perps: str = None, gql_endpoint_rates: str = None):
+    def __init__(self, kwenta, gql_endpoint_perps: str = None, gql_endpoint_rates: str = None,
+                 fetch_schema_from_transport: bool = True):
         self.kwenta = kwenta
         self._gql_endpoint_perps = gql_endpoint_perps
         self._gql_endpoint_rates = gql_endpoint_rates
+        self.fetch_schema_from_transport = fetch_schema_from_transport
 
     def _get_headers(self):
         return {'accept': 'application/json, text/plain, */*',
@@ -56,7 +58,7 @@ class Queries:
 
         async with Client(
             transport=transport,
-            fetch_schema_from_transport=True,
+            fetch_schema_from_transport=self.fetch_schema_from_transport,
         ) as session:
             done_fetching = False
             all_results = []
