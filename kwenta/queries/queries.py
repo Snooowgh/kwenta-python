@@ -47,7 +47,7 @@ class Queries:
     def _make_request(self, url: str, payload: dict):
         try:
             response = requests.post(
-                url, headers=self._get_headers(), json=payload)
+                url, headers=self._get_headers(), json=payload, timeout=2)
             return response.json()['data']
         except Exception as e:
             print(e)
