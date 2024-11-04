@@ -2,7 +2,6 @@ import asyncio
 import time
 import warnings
 from web3 import Web3
-from web3.types import TxParams
 from web3.middleware import geth_poa_middleware
 from decimal import Decimal
 from .constants import (
@@ -297,7 +296,7 @@ class Kwenta:
 
         return markets, market_contracts, sm_account
 
-    def _get_tx_params(self, value=0, to=None, nonce=None) -> TxParams:
+    def _get_tx_params(self, value=0, to=None, nonce=None):
         """
         Get the default tx params
         ...
@@ -318,23 +317,23 @@ class Kwenta:
         gas_price = int(self.w3.eth.gas_price * self.gas_price_boost)
         max_fee_per_gas = gas_price + self.w3.to_wei(2.1, 'gwei')  # 适当加一些，防止 base fee 上升
         if nonce is not None:
-            params: TxParams = {
+            params = {
                 "from": self.wallet_address,
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                "gasPrice": gas_price,
+                # "gasPrice": gas_price,
                 "maxFeePerGas": max_fee_per_gas,
                 "nonce": nonce,
             }
         # Get Nonce from Chain.
         else:
-            params: TxParams = {
+            params = {
                 "from": self.wallet_address,
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                "gasPrice": gas_price,
+                # "gasPrice": gas_price,
                 "maxFeePerGas": max_fee_per_gas,
                 "nonce": self.web3.eth.get_transaction_count(self.wallet_address),
             }
