@@ -323,7 +323,7 @@ class Kwenta:
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                # "gasPrice": int(self.web3.eth.gas_price * self.gas_price_boost),
+                "gasPrice": gas_price,
                 "maxFeePerGas": max_fee_per_gas,
                 "nonce": nonce,
             }
@@ -334,7 +334,7 @@ class Kwenta:
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                # "gasPrice": int(self.web3.eth.gas_price * self.gas_price_boost),
+                "gasPrice": gas_price,
                 "maxFeePerGas": max_fee_per_gas,
                 "nonce": self.web3.eth.get_transaction_count(self.wallet_address),
             }
