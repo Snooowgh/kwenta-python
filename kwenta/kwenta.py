@@ -316,15 +316,15 @@ class Kwenta:
         """
         # Allow user set Nonce
         gas_price = int(self.w3.eth.gas_price * self.gas_price_boost)
-        max_fee_per_gas = gas_price + self.w3.to_wei(2.1, 'gwei')  # 适当加一些，防止 base fee 上升
+        # max_fee_per_gas = gas_price + self.w3.to_wei(2.1, 'gwei')  # 适当加一些，防止 base fee 上升
         if nonce is not None:
             params = {
                 "from": self.wallet_address,
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                # "gasPrice": gas_price,
-                "maxFeePerGas": max_fee_per_gas,
+                "gasPrice": gas_price,
+                # "maxFeePerGas": max_fee_per_gas,
                 "nonce": nonce,
             }
         # Get Nonce from Chain.
@@ -334,8 +334,8 @@ class Kwenta:
                 "to": to,
                 "chainId": self.network_id,
                 "value": value,
-                # "gasPrice": gas_price,
-                "maxFeePerGas": max_fee_per_gas,
+                "gasPrice": gas_price,
+                # "maxFeePerGas": max_fee_per_gas,
                 "nonce": self.web3.eth.get_transaction_count(self.wallet_address),
             }
         return params
