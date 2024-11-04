@@ -219,7 +219,8 @@ class Kwenta:
     def web3(self):
         if self.w3:
             return self.w3
-        w3 = Web3(self.provider_class(self.provider_rpc))
+        w3 = Web3(Web3.HTTPProvider(self.provider_rpc))
+        # w3 = Web3(self.provider_class(self.provider_rpc))
         # w3.middleware_onion.inject(geth_poa_middleware, layer=0)
         self.w3 = w3
         return w3
